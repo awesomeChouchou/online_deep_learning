@@ -64,9 +64,9 @@ class PyTorchBasics:
         """
         raise NotImplementedError
 
-    @staticmethod #timeout..?
+    @staticmethod
     def make_it_pytorch_3(x: torch.Tensor) -> torch.Tensor:
-        return torch.unique(x)
+        return x.unique()
         """
         Return the unique elements of the input tensor in sorted order
 
