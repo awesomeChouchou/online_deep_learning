@@ -1,3 +1,4 @@
+# Used AI assistance for conceptual hints and logic structuring.
 from typing import Tuple
 
 import torch
@@ -21,7 +22,7 @@ class WeatherForecast:
             min_per_day: tensor of size (num_days,)
             max_per_day: tensor of size (num_days,)
         """
-        raise NotImplementedError
+        return torch.min(self.data, dim = 1).values,torch.max(self.data, dim=1).values
 
     def find_the_largest_drop(self) -> torch.Tensor:
         """
@@ -31,7 +32,7 @@ class WeatherForecast:
         Returns:
             tensor of a single value, the difference in temperature
         """
-        raise NotImplementedError
+        return torch.min(torch.diff(torch.mean(self.data,dim=1)))
 
     def find_the_most_extreme_day(self) -> torch.Tensor:
         """
@@ -40,16 +41,18 @@ class WeatherForecast:
         Returns:
             tensor with size (num_days,)
         """
-        raise NotImplementedError
+        max_indices = torch.max(torch.abs(self.data - torch.mean(self.data, dim=1).view(-1,1)),dim=1).indices
+        num_days = self.data.size(0)
+        return self.data[torch.arange(num_days), max_indices]
 
     def max_last_k_days(self, k: int) -> torch.Tensor:
         """
         Find the maximum temperature over the last k days
-
+        
         Returns:
             tensor of size (k,)
         """
-        raise NotImplementedError
+        return torch.max(self.data[-k:], dim=1).values
 
     def predict_temperature(self, k: int) -> torch.Tensor:
         """
@@ -62,7 +65,7 @@ class WeatherForecast:
         Returns:
             tensor of a single value, the predicted temperature
         """
-        raise NotImplementedError
+        return torch.mean(torch.mean(self.data[-k:],dim=1),dim=0)
 
     def what_day_is_this_from(self, t: torch.FloatTensor) -> torch.LongTensor:
         """
@@ -87,4 +90,5 @@ class WeatherForecast:
         Returns:
             tensor of a single value, the index of the closest data element
         """
-        raise NotImplementedError
+        return torch.argmin(torch.sum(torch.abs(self.data-t),dim=1))
+
