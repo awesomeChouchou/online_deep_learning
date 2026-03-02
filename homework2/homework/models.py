@@ -74,6 +74,7 @@ class MLPClassifier(nn.Module):
             num_classes: int, number of classes
         """
         super().__init__()
+        
 
         raise NotImplementedError("MLPClassifier.__init__() is not implemented")
 
@@ -205,3 +206,4 @@ def load_model(model_name: str, with_weights: bool = False, **model_kwargs):
     print(f"Model size: {model_size_mb:.2f} MB")
 
     return r
+
