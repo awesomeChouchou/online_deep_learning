@@ -46,7 +46,8 @@ def train(
     # create loss function and optimizer
     loss_func = ClassificationLoss()
     # optimizer = ...
-    optimizer = torch.optim.SGD(model.parameters(), lr)
+    # optimizer = torch.optim.SGD(model.parameters(), lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     global_step = 0
     metrics = {"train_acc": [], "val_acc": []}
@@ -121,10 +122,14 @@ if __name__ == "__main__":
     parser.add_argument("--num_epoch", type=int, default=50)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=2024)
+    parser.add_argument("--num_layers", type=int, default=4)
+    parser.add_argument("--hidden_dim", type=int, default=128)
 
     # optional: additional model hyperparamters
-    # parser.add_argument("--num_layers", type=int, default=3)
+    
 
     # pass all arguments to train
     train(**vars(parser.parse_args()))
+
+
 
