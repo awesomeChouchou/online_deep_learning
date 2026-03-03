@@ -96,7 +96,6 @@ def train(
 
         logger.add_scalar("train/acc", epoch_train_acc, epoch)
         logger.add_scalar("val/acc", epoch_val_acc, epoch)
-        # raise NotImplementedError("Logging not implemented")
 
         # print on first, last, every 10th epoch
         if epoch == 0 or epoch == num_epoch - 1 or (epoch + 1) % 10 == 0:
