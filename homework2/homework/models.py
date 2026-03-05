@@ -65,6 +65,7 @@ class MLPClassifier(nn.Module):
         h: int = 64,
         w: int = 64,
         num_classes: int = 6,
+        hidden_dim: int = 160,
     ):
         """
         An MLP with a single hidden layer
@@ -76,7 +77,7 @@ class MLPClassifier(nn.Module):
         """
         super().__init__()
         input_dim = 3 * h * w
-        hidden_dim = 128
+        
         self.layer1 = torch.nn.Linear(input_dim, hidden_dim)
         self.act = torch.nn.ReLU()
         self.layer2 = torch.nn.Linear(hidden_dim, num_classes)
