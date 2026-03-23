@@ -49,7 +49,7 @@ class Classifier(nn.Module):
         c1 = in_channels
         c2 = 32
 
-        for _ in range(4):
+        for _ in range(3):
             cnn_layers.append(self.Block(c1, c2))
             c1 = c2
             c2 *= 2
@@ -57,8 +57,24 @@ class Classifier(nn.Module):
         self.network = torch.nn.Sequential(*cnn_layers)
 
         #20%의 뉴런을 무작위로 끔
-        self.dropout = nn.Dropout(0.2)
-        self.classifier = nn.Linear(c1*4*4, num_classes)
+        # self.dropout = nn.Dropout(0.2)
+        # self.classifier = nn.Linear(c1*4*4, num_classes)
+
+        # self.gap = nn.AdaptiveAvgPool2d(1) # 어떤 크기든 1x1로 압축 (B, C, 1, 1)
+        # self.classifier = nn.Sequential(
+        # nn.Linear(c1, 128),  # 중간에 차원을 살짝 키워 일반화 성능 확보
+        # nn.ReLU(),
+        # nn.BatchNorm1d(128), # 1D 데이터용 배치 정규화
+        # nn.Dropout(0.3),     # 드롭아웃 비율을 조금 더 높여도 됨
+        # nn.Linear(128, num_classes)
+        # )
+        self.classifier = nn.Sequential(
+        nn.Linear(c1 * 8 * 8, 256), 
+        nn.ReLU(),
+        nn.BatchNorm1d(256),
+        nn.Dropout(0.5), # 과적합 방지를 위해 조금 높게 설정
+        nn.Linear(256, num_classes)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -74,12 +90,17 @@ class Classifier(nn.Module):
         features = self.network(z)
 
         # pooled = features.mean(dim=[2,3])
-        flat = features.view(features.size(0),-1)
-        flat = self.dropout(flat)
+        # flat = features.view(features.size(0),-1)
+        # flat = self.dropout(flat)
         # logits = self.classifier(pooled)
-        logits = self.classifier(flat)
-      
-        return logits
+        # logits = self.classifier(flat)
+
+
+        # x = self.gap(features)
+        # x = torch.flatten(x, 1) # (B, C)
+
+        x = torch.flatten(features, 1) # (B, 8192)
+        return self.classifier(x)
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         """

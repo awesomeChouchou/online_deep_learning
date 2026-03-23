@@ -18,17 +18,26 @@ def train(
     # **model_kwargs를 통해 추가 인자 전달 가능
     model = load_model(model_name).to(device)
     
-    # 2. 옵티마이저 및 손실 함수
-    # lr 파라미터를 여기서 적용합니다.
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-3)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.3)
-    loss_fn = torch.nn.CrossEntropyLoss()
-
-    # 3. 데이터 로더 설정
+   # 3. 데이터 로더 설정
     # 학습용 데이터에는 'train' 증강 파이프라인 적용
     train_loader = load_data("classification_data/train", transform_pipeline="aug", batch_size=batch_size)
     val_loader = load_data("classification_data/val", transform_pipeline="default", batch_size=batch_size)
 
+
+    # 2. 옵티마이저 및 손실 함수
+    # lr 파라미터를 여기서 적용합니다.
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-3)
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.3)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optimizer, 
+    max_lr=1e-3, # 시작보다 조금 높은 값
+    steps_per_epoch=len(train_loader), 
+    epochs=num_epoch
+    )
+    
+    loss_fn = torch.nn.CrossEntropyLoss(label_smoothing=0.1)
+
+ 
     print(f"Starting training: {model_name} on {device} (Epochs: {num_epoch}, LR: {lr})")
 
     # 4. 학습 루프
@@ -44,11 +53,13 @@ def train(
 
             optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+          
 
             train_loss += loss.item()
+            optimizer.step()
+            scheduler.step()
 
-        scheduler.step()
+   
 
         # 5. 매 에폭마다 검증 수행
         model.eval()
