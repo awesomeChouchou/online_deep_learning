@@ -20,7 +20,8 @@ def train(
     
     # 2. 옵티마이저 및 손실 함수
     # lr 파라미터를 여기서 적용합니다.
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-3)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.3)
     loss_fn = torch.nn.CrossEntropyLoss()
 
     # 3. 데이터 로더 설정
@@ -46,6 +47,8 @@ def train(
             optimizer.step()
 
             train_loss += loss.item()
+
+        scheduler.step()
 
         # 5. 매 에폭마다 검증 수행
         model.eval()

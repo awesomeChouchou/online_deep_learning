@@ -56,7 +56,9 @@ class Classifier(nn.Module):
 
         self.network = torch.nn.Sequential(*cnn_layers)
 
-        self.classifier = nn.Linear(4096, num_classes)
+        #20%의 뉴런을 무작위로 끔
+        self.dropout = nn.Dropout(0.2)
+        self.classifier = nn.Linear(c1*4*4, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -73,6 +75,7 @@ class Classifier(nn.Module):
 
         # pooled = features.mean(dim=[2,3])
         flat = features.view(features.size(0),-1)
+        flat = self.dropout(flat)
         # logits = self.classifier(pooled)
         logits = self.classifier(flat)
       

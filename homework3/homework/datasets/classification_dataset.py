@@ -39,8 +39,9 @@ class SuperTuxDataset(Dataset):
             xform = transforms.Compose(
                 [
                     # TODO: fix
-                    transforms.RandomRotation(degrees=15),
-                    transforms.ColorJitter(0.9, 0.9, 0.9, 0.1),
+                    transforms.RandomRotation(degrees=10),
+                    # 밝기, 대비, 채도, 색상
+                    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
                     transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
                 ]
