@@ -9,6 +9,26 @@ INPUT_STD = [0.2064, 0.1944, 0.2252]
 
 
 class Classifier(nn.Module):
+    class Block(torch.nn.Module):
+        def __init__(self, in_channels, out_channels):
+            super().__init__()
+            kernel_size = 3
+            padding = (kernel_size - 1) // 2
+
+            self.c1 = torch.nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=padding)
+            self.batchnorm = torch.nn.BatchNorm2d(out_channels)
+            self.relu = torch.nn.ReLU()
+            self.maxpool = torch.nn.MaxPool2d(2)
+          
+
+        def forward(self, x):
+            x = self.c1(x)
+            x = self.batchnorm(x)
+            x = self.relu(x)
+            x = self.maxpool(x)
+            return x
+
+
     def __init__(
         self,
         in_channels: int = 3,
@@ -25,9 +45,18 @@ class Classifier(nn.Module):
 
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
+        cnn_layers = []
+        c1 = in_channels
+        c2 = 16
 
-        # TODO: implement
-        pass
+        for _ in range(3):
+            cnn_layers.append(self.Block(c1, c2))
+            c1 = c2
+            c2 *= 2
+
+        self.network = torch.nn.Sequential(*cnn_layers)
+
+        self.classifier = nn.Linear(c1, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -39,10 +68,12 @@ class Classifier(nn.Module):
         """
         # optional: normalizes the input
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
+        
+        features = self.network(z)
 
-        # TODO: replace with actual forward pass
-        logits = torch.randn(x.size(0), 6)
-
+        pooled = features.mean(dim=[2,3])
+        logits = self.classifier(pooled)
+      
         return logits
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
