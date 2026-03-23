@@ -39,7 +39,8 @@ class SuperTuxDataset(Dataset):
             xform = transforms.Compose(
                 [
                     # TODO: fix
-                    # transforms.ColorJitter(0.9, 0.9, 0.9, 0.1),
+                    transforms.RandomRotation(degrees=15),
+                    transforms.ColorJitter(0.9, 0.9, 0.9, 0.1),
                     transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
                 ]
@@ -98,3 +99,4 @@ def load_data(
         shuffle=shuffle,
         drop_last=True,
     )
+

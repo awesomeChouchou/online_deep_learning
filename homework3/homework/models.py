@@ -47,16 +47,16 @@ class Classifier(nn.Module):
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
         cnn_layers = []
         c1 = in_channels
-        c2 = 16
+        c2 = 32
 
-        for _ in range(3):
+        for _ in range(4):
             cnn_layers.append(self.Block(c1, c2))
             c1 = c2
             c2 *= 2
 
         self.network = torch.nn.Sequential(*cnn_layers)
 
-        self.classifier = nn.Linear(c1, num_classes)
+        self.classifier = nn.Linear(4096, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -71,8 +71,10 @@ class Classifier(nn.Module):
         
         features = self.network(z)
 
-        pooled = features.mean(dim=[2,3])
-        logits = self.classifier(pooled)
+        # pooled = features.mean(dim=[2,3])
+        flat = features.view(features.size(0),-1)
+        # logits = self.classifier(pooled)
+        logits = self.classifier(flat)
       
         return logits
 
