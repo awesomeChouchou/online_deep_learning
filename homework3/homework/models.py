@@ -1,3 +1,4 @@
+
 from pathlib import Path
 
 import torch
@@ -135,8 +136,33 @@ class Detector(torch.nn.Module):
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
-        # TODO: implement
-        pass
+        # Encoder: (B, 3, 96, 128) -> (B, 64, 24, 32) 정도로 축소
+        self.down1 = nn.Sequential(
+            nn.Conv2d(in_channels, 32, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU()
+        )
+        self.down2 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU()
+        )
+
+        # Decoder: (B, 64, 24, 32) -> (B, 3, 96, 128)로 복원
+        self.up1 = nn.Sequential(
+            nn.Conv2dTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU()
+        )
+        self.up2 = nn.Sequential(
+            nn.Conv2dTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(16),
+            nn.ReLU()
+        )
+
+        # 최종 출력 헤드
+        self.classifier = nn.Conv2d(16, num_classes, kernel_size=1)
+        self.depth_regressor = nn.Conv2d(16, 1, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -154,11 +180,17 @@ class Detector(torch.nn.Module):
         # optional: normalizes the input
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
-        # TODO: replace with actual forward pass
-        logits = torch.randn(x.size(0), 3, x.size(2), x.size(3))
-        raw_depth = torch.rand(x.size(0), x.size(2), x.size(3))
+        d1 = self.down1(z)
+        d2 = self.down2(d1)
 
-        return logits, raw_depth
+        u1 = self.up1(d2) + d1
+        u2 = self.up2(u1)
+
+        logits = self.classifier(u2)
+        depth = torch.sigmoid(self.depth_regressor(u2)).squeeze(1)
+
+
+        return logits, depth
 
     def predict(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -269,3 +301,4 @@ def debug_model(batch_size: int = 1):
 
 if __name__ == "__main__":
     debug_model()
+
