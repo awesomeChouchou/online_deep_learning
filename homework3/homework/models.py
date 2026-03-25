@@ -172,8 +172,10 @@ class Detector(torch.nn.Module):
         self.down1 = self.DownBlock(in_channels, 32)   # /2
         self.down2 = self.DownBlock(32, 64)             # /4
         self.down3 = self.DownBlock(64, 128)            # /8
+        self.down4 = self.DownBlock(128, 256)           # /16
 
         # Decoder with skip connections
+        self.up0 = self.UpBlock(256, 128)   # /8
         self.up1 = self.UpBlock(128, 64)    # /4
         self.up2 = self.UpBlock(64, 32)     # /2
         self.up3 = self.UpBlock(32, 32)     # /1 (skip from input conv)
@@ -209,9 +211,11 @@ class Detector(torch.nn.Module):
         s1 = self.down1(z)       # (B, 32, H/2, W/2)
         s2 = self.down2(s1)      # (B, 64, H/4, W/4)
         s3 = self.down3(s2)      # (B, 128, H/8, W/8)
+        s4 = self.down4(s3)      # (B, 256, H/16, W/16)
 
         # Decoder with skip connections
-        u1 = self.up1(s3, s2)    # (B, 64, H/4, W/4)
+        u0 = self.up0(s4, s3)    # (B, 128, H/8, W/8)
+        u1 = self.up1(u0, s2)    # (B, 64, H/4, W/4)
         u2 = self.up2(u1, s1)    # (B, 32, H/2, W/2)
         u3 = self.up3(u2, s0)    # (B, 32, H, W)
 
