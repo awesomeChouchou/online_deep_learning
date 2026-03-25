@@ -154,7 +154,17 @@ class RandomHorizontalFlip(tv_transforms.RandomHorizontalFlip):
     def __call__(self, sample: dict):
         if np.random.rand() < self.p:
             sample["image"] = np.flip(sample["image"], axis=2).copy()
-            sample["track"] = np.flip(sample["track"], axis=1).copy()
+
+            # flip depth too
+            if "depth" in sample:
+                sample["depth"] = np.flip(sample["depth"], axis=1).copy()
+
+            # flip track AND swap left(1) <-> right(2) labels
+            track = np.flip(sample["track"], axis=1).copy()
+            swapped = track.copy()
+            swapped[track == 1] = 2
+            swapped[track == 2] = 1
+            sample["track"] = swapped
 
         return sample
 

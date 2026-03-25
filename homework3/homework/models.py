@@ -119,6 +119,38 @@ class Classifier(nn.Module):
 
 
 class Detector(torch.nn.Module):
+    class DownBlock(nn.Module):
+        def __init__(self, in_c, out_c):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Conv2d(in_c, out_c, 3, stride=2, padding=1),
+                nn.BatchNorm2d(out_c),
+                nn.ReLU(),
+                nn.Conv2d(out_c, out_c, 3, padding=1),
+                nn.BatchNorm2d(out_c),
+                nn.ReLU(),
+            )
+
+        def forward(self, x):
+            return self.net(x)
+
+    class UpBlock(nn.Module):
+        def __init__(self, in_c, out_c):
+            super().__init__()
+            self.up = nn.ConvTranspose2d(in_c, out_c, 3, stride=2, padding=1, output_padding=1)
+            self.conv = nn.Sequential(
+                nn.BatchNorm2d(out_c * 2),  # after concat with skip
+                nn.ReLU(),
+                nn.Conv2d(out_c * 2, out_c, 3, padding=1),
+                nn.BatchNorm2d(out_c),
+                nn.ReLU(),
+            )
+
+        def forward(self, x, skip):
+            x = self.up(x)
+            x = torch.cat([x, skip], dim=1)
+            return self.conv(x)
+
     def __init__(
         self,
         in_channels: int = 3,
@@ -136,40 +168,24 @@ class Detector(torch.nn.Module):
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
-        # 1. Encoder (이미지 축소)
-        self.down1 = nn.Sequential(
-            nn.Conv2d(in_channels, 64, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU()
-        ) # 출력: (B, 64, 48, 64)
-        
-        self.down2 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU()
-        ) # 출력: (B, 128, 24, 32)
+        # Encoder
+        self.down1 = self.DownBlock(in_channels, 32)   # /2
+        self.down2 = self.DownBlock(32, 64)             # /4
+        self.down3 = self.DownBlock(64, 128)            # /8
 
-        # 2. Decoder (이미지 복원)
-        self.up1 = nn.Sequential(
-            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU()
-        ) # 출력: (B, 32, 48, 64)
+        # Decoder with skip connections
+        self.up1 = self.UpBlock(128, 64)    # /4
+        self.up2 = self.UpBlock(64, 32)     # /2
+        self.up3 = self.UpBlock(32, 32)     # /1 (skip from input conv)
 
-        # [중요] up1의 출력(32) + down1의 출력(32) = 총 64채널이 up2로 들어갑니다.
-        self.up2 = nn.Sequential(
-            nn.ConvTranspose2d(128, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU()
-        ) # 출력: (B, 32, 96, 128)
-
-        # 3. Heads
-        self.classifier = nn.Sequential(
-            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+        self.input_conv = nn.Sequential(
+            nn.Conv2d(in_channels, 32, 3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(),
-            nn.Conv2d(32, num_classes, kernel_size=1)
         )
+
+        # Heads
+        self.classifier = nn.Conv2d(32, num_classes, kernel_size=1)
         self.depth_regressor = nn.Conv2d(32, 1, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -189,18 +205,18 @@ class Detector(torch.nn.Module):
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
         # Encoder
-        d1 = self.down1(z)   # (B, 32, 48, 64)
-        d2 = self.down2(d1)  # (B, 64, 24, 32)
+        s0 = self.input_conv(z)  # (B, 32, H, W)
+        s1 = self.down1(z)       # (B, 32, H/2, W/2)
+        s2 = self.down2(s1)      # (B, 64, H/4, W/4)
+        s3 = self.down3(s2)      # (B, 128, H/8, W/8)
 
-        # Decoder with Skip Connection
-        u1_up = self.up1(d2) # (B, 32, 48, 64)
-        u1 = torch.cat([u1_up, d1], dim=1) # (B, 32+32=64, 48, 64) -> 여기서 64채널이 됨!
-        
-        u2 = self.up2(u1)    # (B, 16, 96, 128) -> up2가 64를 받아서 16으로 줄임
+        # Decoder with skip connections
+        u1 = self.up1(s3, s2)    # (B, 64, H/4, W/4)
+        u2 = self.up2(u1, s1)    # (B, 32, H/2, W/2)
+        u3 = self.up3(u2, s0)    # (B, 32, H, W)
 
-        logits = self.classifier(u2)
-        depth = torch.sigmoid(self.depth_regressor(u2)).squeeze(1)
-
+        logits = self.classifier(u3)
+        depth = torch.sigmoid(self.depth_regressor(u3)).squeeze(1)
 
         return logits, depth
 
@@ -219,11 +235,8 @@ class Detector(torch.nn.Module):
         """
         logits, raw_depth = self(x)
         pred = logits.argmax(dim=1)
-        print(f"Pred unique values: {torch.unique(pred)}")
-        # Optional additional post-processing for depth only if needed
-        depth = raw_depth
 
-        return pred, depth
+        return pred, raw_depth
 
 
 MODEL_FACTORY = {
