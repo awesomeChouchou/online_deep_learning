@@ -41,7 +41,7 @@ def train(
 
             loss_seg = loss_fn_seg(logits, target_seg)
             loss_depth = loss_fn_depth(depth, target_depth)
-            loss = loss_seg + loss_depth
+            loss = 3.0 * loss_seg + loss_depth
 
             optimizer.zero_grad()
             loss.backward()
