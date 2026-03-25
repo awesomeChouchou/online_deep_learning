@@ -169,6 +169,36 @@ class RandomHorizontalFlip(tv_transforms.RandomHorizontalFlip):
         return sample
 
 
+class ColorJitter:
+    def __init__(self, brightness=0.3, contrast=0.3, saturation=0.3):
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+
+    def __call__(self, sample: dict):
+        image = sample["image"]  # (C, H, W), float32 [0, 1]
+
+        # brightness
+        if self.brightness > 0:
+            factor = 1.0 + np.random.uniform(-self.brightness, self.brightness)
+            image = image * factor
+
+        # contrast
+        if self.contrast > 0:
+            factor = 1.0 + np.random.uniform(-self.contrast, self.contrast)
+            mean = image.mean()
+            image = (image - mean) * factor + mean
+
+        # saturation
+        if self.saturation > 0:
+            factor = 1.0 + np.random.uniform(-self.saturation, self.saturation)
+            gray = image.mean(axis=0, keepdims=True)
+            image = (image - gray) * factor + gray
+
+        sample["image"] = np.clip(image, 0.0, 1.0).astype(np.float32)
+        return sample
+
+
 class TrackProcessor:
     """
     Provides segmentation labels for left and right track
