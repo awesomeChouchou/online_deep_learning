@@ -164,7 +164,12 @@ class Detector(torch.nn.Module):
         ) # 출력: (B, 32, 96, 128)
 
         # 3. Heads
-        self.classifier = nn.Conv2d(32, num_classes, kernel_size=1)
+        self.classifier = nn.Sequential(
+            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Conv2d(32, num_classes, kernel_size=1)
+        )
         self.depth_regressor = nn.Conv2d(32, 1, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
