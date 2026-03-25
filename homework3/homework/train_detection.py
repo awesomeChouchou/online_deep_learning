@@ -36,7 +36,8 @@ def train(
     epochs=num_epoch
     )
     
-    loss_fn_seg = torch.nn.CrossEntropyLoss()
+    weights = torch.tensor([1.0, 50.0, 50.0]).to(device)
+    loss_fn_seg = torch.nn.CrossEntropyLoss(weight=weights)
     loss_fn_depth = torch.nn.L1Loss() # MAE 계산을 위해 L1Loss 추천
 
  
@@ -62,7 +63,7 @@ def train(
             # depth: (B, H, W), target_depth: (B, H, W)
             loss_depth = loss_fn_depth(depth, target_depth)
 
-            total_loss = loss_seg + 1.0 * loss_depth
+            total_loss = loss_seg + 0.1 * loss_depth
             
 
 
@@ -94,7 +95,9 @@ def train(
                 # Depth 평가 (힌트의 MAE < 0.05 달성 확인용)
                 total_val_mae += torch.abs(depth - target_depth).mean().item()
 
-        miou = conf_matrix.iou.mean().item()
+        conf_matrix_dict = conf_matrix.compute()
+        miou = conf_matrix_dict['iou']
+
         avg_mae = total_val_mae / len(val_loader)
         print(f"Epoch {epoch+1:02d} | Loss: {total_train_loss/len(train_loader):.4f} | "
               f"mIoU: {miou:.4f} | MAE: {avg_mae:.4f}")

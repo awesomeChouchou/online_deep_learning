@@ -150,12 +150,12 @@ class Detector(torch.nn.Module):
 
         # Decoder: (B, 64, 24, 32) -> (B, 3, 96, 128)로 복원
         self.up1 = nn.Sequential(
-            nn.Conv2dTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU()
         )
         self.up2 = nn.Sequential(
-            nn.Conv2dTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.BatchNorm2d(16),
             nn.ReLU()
         )
