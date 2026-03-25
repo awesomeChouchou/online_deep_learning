@@ -155,7 +155,7 @@ class Detector(torch.nn.Module):
             nn.ReLU()
         )
         self.up2 = nn.Sequential(
-            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(64, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.BatchNorm2d(16),
             nn.ReLU()
         )
@@ -183,7 +183,8 @@ class Detector(torch.nn.Module):
         d1 = self.down1(z)
         d2 = self.down2(d1)
 
-        u1 = self.up1(d2) + d1
+        u1_up = self.up1(d2)
+        u1 = torch.cat([u1_up, d1], dim=1)
         u2 = self.up2(u1)
 
         logits = self.classifier(u2)
