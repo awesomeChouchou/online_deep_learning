@@ -136,31 +136,34 @@ class Detector(torch.nn.Module):
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
-        # Encoder: (B, 3, 96, 128) -> (B, 64, 24, 32) 정도로 축소
+        # 1. Encoder (이미지 축소)
         self.down1 = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU()
-        )
+        ) # 출력: (B, 32, 48, 64)
+        
         self.down2 = nn.Sequential(
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU()
-        )
+        ) # 출력: (B, 64, 24, 32)
 
-        # Decoder: (B, 64, 24, 32) -> (B, 3, 96, 128)로 복원
+        # 2. Decoder (이미지 복원)
         self.up1 = nn.Sequential(
             nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU()
-        )
+        ) # 출력: (B, 32, 48, 64)
+
+        # [중요] up1의 출력(32) + down1의 출력(32) = 총 64채널이 up2로 들어갑니다.
         self.up2 = nn.Sequential(
             nn.ConvTranspose2d(64, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.BatchNorm2d(16),
             nn.ReLU()
-        )
+        ) # 출력: (B, 16, 96, 128)
 
-        # 최종 출력 헤드
+        # 3. Heads
         self.classifier = nn.Conv2d(16, num_classes, kernel_size=1)
         self.depth_regressor = nn.Conv2d(16, 1, kernel_size=1)
 
@@ -180,12 +183,15 @@ class Detector(torch.nn.Module):
         # optional: normalizes the input
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
-        d1 = self.down1(z)
-        d2 = self.down2(d1)
+        # Encoder
+        d1 = self.down1(z)   # (B, 32, 48, 64)
+        d2 = self.down2(d1)  # (B, 64, 24, 32)
 
-        u1_up = self.up1(d2)
-        u1 = torch.cat([u1_up, d1], dim=1)
-        u2 = self.up2(u1)
+        # Decoder with Skip Connection
+        u1_up = self.up1(d2) # (B, 32, 48, 64)
+        u1 = torch.cat([u1_up, d1], dim=1) # (B, 32+32=64, 48, 64) -> 여기서 64채널이 됨!
+        
+        u2 = self.up2(u1)    # (B, 16, 96, 128) -> up2가 64를 받아서 16으로 줄임
 
         logits = self.classifier(u2)
         depth = torch.sigmoid(self.depth_regressor(u2)).squeeze(1)

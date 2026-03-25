@@ -36,7 +36,7 @@ def train(
     epochs=num_epoch
     )
     
-    weights = torch.tensor([1.0, 50.0, 50.0]).to(device)
+    weights = torch.tensor([0.1, 10.0, 10.0]).to(device)
     loss_fn_seg = torch.nn.CrossEntropyLoss(weight=weights)
     loss_fn_depth = torch.nn.L1Loss() # MAE 계산을 위해 L1Loss 추천
 
