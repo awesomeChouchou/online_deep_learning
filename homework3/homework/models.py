@@ -138,34 +138,34 @@ class Detector(torch.nn.Module):
 
         # 1. Encoder (이미지 축소)
         self.down1 = nn.Sequential(
-            nn.Conv2d(in_channels, 32, kernel_size=3, stride=2, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU()
-        ) # 출력: (B, 32, 48, 64)
-        
-        self.down2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(in_channels, 64, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU()
-        ) # 출력: (B, 64, 24, 32)
+        ) # 출력: (B, 64, 48, 64)
+        
+        self.down2 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU()
+        ) # 출력: (B, 128, 24, 32)
 
         # 2. Decoder (이미지 복원)
         self.up1 = nn.Sequential(
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.BatchNorm2d(32),
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(64),
             nn.ReLU()
         ) # 출력: (B, 32, 48, 64)
 
         # [중요] up1의 출력(32) + down1의 출력(32) = 총 64채널이 up2로 들어갑니다.
         self.up2 = nn.Sequential(
-            nn.ConvTranspose2d(64, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.BatchNorm2d(16),
+            nn.ConvTranspose2d(128, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(32),
             nn.ReLU()
-        ) # 출력: (B, 16, 96, 128)
+        ) # 출력: (B, 32, 96, 128)
 
         # 3. Heads
-        self.classifier = nn.Conv2d(16, num_classes, kernel_size=1)
-        self.depth_regressor = nn.Conv2d(16, 1, kernel_size=1)
+        self.classifier = nn.Conv2d(32, num_classes, kernel_size=1)
+        self.depth_regressor = nn.Conv2d(32, 1, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -214,7 +214,7 @@ class Detector(torch.nn.Module):
         """
         logits, raw_depth = self(x)
         pred = logits.argmax(dim=1)
-
+        print(f"Pred unique values: {torch.unique(pred)}")
         # Optional additional post-processing for depth only if needed
         depth = raw_depth
 

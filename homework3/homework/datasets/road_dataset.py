@@ -65,6 +65,9 @@ class RoadDataset(Dataset):
         sample = {"_idx": idx, "_frames": self.frames}
         sample = self.transform(sample)
 
+        # if "track" in sample:
+        #     print(f"DEBUG: sample['track'] max value: {sample['track'].max()}")
+
         # remove private keys
         for key in list(sample.keys()):
             if key.startswith("_"):
