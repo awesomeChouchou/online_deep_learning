@@ -1,3 +1,4 @@
+# Used AI assistance for conceptual hints and logic structuring.
 from pathlib import Path
 
 import torch
