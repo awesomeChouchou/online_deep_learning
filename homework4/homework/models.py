@@ -24,6 +24,17 @@ class MLPPlanner(nn.Module):
         self.n_track = n_track
         self.n_waypoints = n_waypoints
 
+        input_dim = n_track * 2 * 2  # left + right, each has 2 coords
+        hidden_dim = 128
+
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, n_waypoints * 2),
+        )
+
     def forward(
         self,
         track_left: torch.Tensor,
@@ -43,7 +54,10 @@ class MLPPlanner(nn.Module):
         Returns:
             torch.Tensor: future waypoints with shape (b, n_waypoints, 2)
         """
-        raise NotImplementedError
+        b = track_left.shape[0]
+        x = torch.cat([track_left.flatten(1), track_right.flatten(1)], dim=1)
+        out = self.net(x)
+        return out.view(b, self.n_waypoints, 2)
 
 
 class TransformerPlanner(nn.Module):
@@ -60,6 +74,18 @@ class TransformerPlanner(nn.Module):
 
         self.query_embed = nn.Embedding(n_waypoints, d_model)
 
+        # encode track points (2D coords) to d_model
+        self.input_proj = nn.Linear(2, d_model)
+
+        # transformer decoder: queries attend to track features
+        decoder_layer = nn.TransformerDecoderLayer(
+            d_model=d_model, nhead=4, dim_feedforward=128, batch_first=True
+        )
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=3)
+
+        # output head
+        self.output_head = nn.Linear(d_model, 2)
+
     def forward(
         self,
         track_left: torch.Tensor,
@@ -79,7 +105,19 @@ class TransformerPlanner(nn.Module):
         Returns:
             torch.Tensor: future waypoints with shape (b, n_waypoints, 2)
         """
-        raise NotImplementedError
+        b = track_left.shape[0]
+
+        # concat left and right track points as memory: (b, 2*n_track, 2)
+        track = torch.cat([track_left, track_right], dim=1)
+        memory = self.input_proj(track)  # (b, 2*n_track, d_model)
+
+        # query embeddings: (b, n_waypoints, d_model)
+        queries = self.query_embed.weight.unsqueeze(0).expand(b, -1, -1)
+
+        # cross-attention: queries attend to track features
+        out = self.decoder(queries, memory)  # (b, n_waypoints, d_model)
+
+        return self.output_head(out)  # (b, n_waypoints, 2)
 
 
 class CNNPlanner(torch.nn.Module):
@@ -94,6 +132,20 @@ class CNNPlanner(torch.nn.Module):
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN), persistent=False)
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD), persistent=False)
 
+        self.backbone = nn.Sequential(
+            nn.Conv2d(3, 32, 3, stride=2, padding=1), nn.BatchNorm2d(32), nn.ReLU(),
+            nn.Conv2d(32, 64, 3, stride=2, padding=1), nn.BatchNorm2d(64), nn.ReLU(),
+            nn.Conv2d(64, 128, 3, stride=2, padding=1), nn.BatchNorm2d(128), nn.ReLU(),
+            nn.Conv2d(128, 256, 3, stride=2, padding=1), nn.BatchNorm2d(256), nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1),
+        )
+
+        self.head = nn.Sequential(
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, n_waypoints * 2),
+        )
+
     def forward(self, image: torch.Tensor, **kwargs) -> torch.Tensor:
         """
         Args:
@@ -105,7 +157,10 @@ class CNNPlanner(torch.nn.Module):
         x = image
         x = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
-        raise NotImplementedError
+        x = self.backbone(x)
+        x = x.flatten(1)  # (b, 256)
+        x = self.head(x)  # (b, n_waypoints * 2)
+        return x.view(-1, self.n_waypoints, 2)
 
 
 MODEL_FACTORY = {
